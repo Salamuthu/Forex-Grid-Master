@@ -1,33 +1,68 @@
 import tkinter as tk
+from threading import Thread
 import MetaTrader5 as mt5
 from classes import Bot
-from threading import Thread
 
-root = tk.Tk()
-root.title('Forex Grid Master')
-root.geometry('300x780')
-root.resizable(False, False)
-
-
-
+# --- STYLE CONFIGURATION ---
 COLORS = {
-    'bg': '#1e1e1e',        # Dark Grey Background
-    'fg': '#e0e0e0',        # Off-white text
-    'entry_bg': '#2d2d2d',  # Lighter Grey for inputs
-    'entry_fg': '#ffffff',  # White text for inputs
-    'accent': '#007acc',    # Professional Blue
-    'accent_hover': '#005f9e',
-    'btn_text': '#ffffff'
+    'bg_main': '#121212',  # Deep Black
+    'bg_card': '#1E1E1E',  # Card Background
+    'text_main': '#E0E0E0',  # White-ish text
+    'text_dim': '#757575',  # Placeholder text
+    'input_bg': '#252525',  # Input field background
+    'input_fg': '#FFFFFF',
+    'accent_blue': '#2196F3',  # Bot 1
+    'accent_orange': '#FF9800',  # Bot 2
+    'accent_purple': '#9C27B0',  # Bot 3
+    'success': '#4CAF50',  # Connect Button
 }
 
 FONTS = {
-    'main': ('Segoe UI', 9),
-    'bold': ('Segoe UI', 9, 'bold'),
-    'header': ('Segoe UI', 10, 'bold')
+    'header': ('Segoe UI', 9, 'bold'),
+    'input': ('Consolas', 9),
+    'btn': ('Segoe UI', 8, 'bold')
 }
 
-root.configure(bg=COLORS['bg'])
 
+# --- HELPER CLASS FOR STYLISH INPUTS ---
+class CompactEntry(tk.Frame):
+    def __init__(self, parent, placeholder, is_password=False):
+        super().__init__(parent, bg=COLORS['input_bg'], padx=5, pady=3)
+        self.entry = tk.Entry(
+            self, bg=COLORS['input_bg'], fg=COLORS['input_fg'],
+            font=FONTS['input'], relief='flat', insertbackground='white',
+            show="•" if is_password else ""
+        )
+        self.entry.pack(fill='both')
+
+        self.placeholder = placeholder
+        if placeholder:
+            self.entry.insert(0, placeholder)
+            self.entry.config(fg=COLORS['text_dim'])
+            self.entry.bind("<FocusIn>", self._clear_placeholder)
+            self.entry.bind("<FocusOut>", self._add_placeholder)
+
+    def _clear_placeholder(self, event):
+        if self.entry.get() == self.placeholder:
+            self.entry.delete(0, tk.END)
+            self.entry.config(fg=COLORS['input_fg'])
+
+    def _add_placeholder(self, event):
+        if not self.entry.get():
+            self.entry.insert(0, self.placeholder)
+            self.entry.config(fg=COLORS['text_dim'])
+
+    def get(self):
+        val = self.entry.get()
+        return val if val != self.placeholder else ""
+
+
+# --- MAIN APP ---
+root = tk.Tk()
+root.title('Forex Grid Master')
+root.geometry('290x700')  # Compact size
+root.configure(bg=COLORS['bg_main'])
+root.resizable(False, False)
 
 try:
     icon = tk.PhotoImage(file='logo (1).png')
@@ -35,210 +70,198 @@ try:
 except Exception:
     pass
 
+# Container to hold everything neatly
+main_container = tk.Frame(root, bg=COLORS['bg_main'], padx=10, pady=10)
+main_container.pack(fill='both', expand=True)
 
-lbl_style = {'bg': COLORS['bg'], 'fg': COLORS['fg'], 'font': FONTS['main'], 'anchor': 'w'}
-entry_style = {
-    'bg': COLORS['entry_bg'],
-    'fg': COLORS['entry_fg'],
-    'insertbackground': 'white',
-    'relief': 'flat',
-    'highlightthickness': 1,
-    'highlightbackground': '#3e3e3e',
-    'highlightcolor': COLORS['accent']
-}
-btn_style = {
-    'bg': COLORS['accent'],
-    'fg': COLORS['btn_text'],
-    'font': FONTS['bold'],
-    'relief': 'flat',
-    'activebackground': COLORS['accent_hover'],
-    'activeforeground': '#ffffff',
-    'cursor': 'hand2'
-}
-grid_pad = {'padx': 6, 'pady': 4, 'sticky': 'ew'}
+# --- LOGIN SECTION ---
+lbl_login_header = tk.Label(main_container, text="TERMINAL ACCESS", bg=COLORS['bg_main'], fg=COLORS['text_dim'],
+                            font=FONTS['header'])
+lbl_login_header.pack(anchor='w', pady=(0, 5))
 
+fr_auth = tk.Frame(main_container, bg=COLORS['bg_card'], padx=10, pady=10)
+fr_auth.pack(fill='x', pady=(0, 15))
 
-tk.Label(root, text="--- FOREX GRID MASTER ---", bg=COLORS['bg'], fg=COLORS['accent'], font=FONTS['header']).grid(row=0, column=0, columnspan=2, pady=(5, 5))
+txtb_login = CompactEntry(fr_auth, "Login ID")
+txtb_login.pack(fill='x', pady=2)
 
-lbl_login = tk.Label(root, text='Login ID', **lbl_style)
-lbl_password = tk.Label(root, text='Password', **lbl_style)
-lbl_server = tk.Label(root, text='Server', **lbl_style)
+txtb_password = CompactEntry(fr_auth, "Password", is_password=True)
+txtb_password.pack(fill='x', pady=2)
 
-txtb_login = tk.Entry(root, **entry_style)
-txtb_password = tk.Entry(root, show="•", **entry_style)
-txtb_server = tk.Entry(root, **entry_style)
+txtb_server = CompactEntry(fr_auth, "Server")
+txtb_server.pack(fill='x', pady=(2, 8))
+
 
 def login():
     try:
         login_id = int(txtb_login.get())
         password = str(txtb_password.get())
         server = str(txtb_server.get())
-        mt5.initialize(login=login_id, password=password, server=server)
+        if mt5.initialize(login=login_id, password=password, server=server):
+            print("Connected")
+        else:
+            print("Failed")
     except ValueError:
         pass
 
-btn_login = tk.Button(root, text='CONNECT', **btn_style, command=login)
 
+btn_login = tk.Button(fr_auth, text='CONNECT', bg=COLORS['success'], fg='white', font=FONTS['btn'], relief='flat',
+                      command=login)
+btn_login.pack(fill='x')
 
-lbl_login.grid(row=1, column=0, **grid_pad)
-txtb_login.grid(row=1, column=1, **grid_pad)
+# --- BOT 1 SECTION ---
+fr_b1 = tk.Frame(main_container, bg=COLORS['bg_card'])
+fr_b1.pack(fill='x', pady=(0, 10))
 
-lbl_password.grid(row=2, column=0, **grid_pad)
-txtb_password.grid(row=2, column=1, **grid_pad)
+# Color strip
+tk.Frame(fr_b1, bg=COLORS['accent_blue'], width=3).pack(side='left', fill='y')
 
-lbl_server.grid(row=3, column=0, **grid_pad)
-txtb_server.grid(row=3, column=1, **grid_pad)
+# Content
+content_b1 = tk.Frame(fr_b1, bg=COLORS['bg_card'], padx=10, pady=8)
+content_b1.pack(side='left', fill='both', expand=True)
 
-btn_login.grid(row=4, column=1, columnspan=2, padx=2, pady=2, sticky='ew')
+tk.Label(content_b1, text="Bot 1", bg=COLORS['bg_card'], fg=COLORS['accent_blue'], font=FONTS['header']).pack(
+    anchor='w', pady=(0, 5))
 
+grid_b1 = tk.Frame(content_b1, bg=COLORS['bg_card'])
+grid_b1.pack(fill='x')
 
+txtb_symbol_b1 = CompactEntry(grid_b1, "Symbol")
+txtb_symbol_b1.grid(row=0, column=0, padx=(0, 2), pady=2, sticky='ew')
 
-# BOT 1 SECTION
+txtb_volume_b1 = CompactEntry(grid_b1, "Vol (0.01)")
+txtb_volume_b1.grid(row=0, column=1, padx=(2, 0), pady=2, sticky='ew')
 
-tk.Label(root, text="BOT 1 CONFIG ", bg=COLORS['bg'], fg=COLORS['accent'], font=FONTS['header']).grid(row=5, column=0, columnspan=2, pady=(2, 2), sticky='w', padx=10)
+txtb_tp_b1 = CompactEntry(grid_b1, "TP")
+txtb_tp_b1.grid(row=1, column=0, padx=(0, 2), pady=2, sticky='ew')
 
-lbl_symbol_b1 = tk.Label(root, text='Symbol', **lbl_style)
-lbl_volume_b1 = tk.Label(root, text='Volume', **lbl_style)
-lbl_tp_b1 = tk.Label(root, text='Take Profit', **lbl_style)
-lbl_no_of_levels_b1 = tk.Label(root, text='Levels', **lbl_style)
-lbl_no_of_cycles_b1 = tk.Label(root, text='Cycles', **lbl_style)
+txtb_levels_b1 = CompactEntry(grid_b1, "Levels")
+txtb_levels_b1.grid(row=1, column=1, padx=(2, 0), pady=2, sticky='ew')
 
-txtb_symbol_b1 = tk.Entry(root, **entry_style)
-txtb_volume_b1 = tk.Entry(root, **entry_style)
-txtb_tp_b1 = tk.Entry(root, **entry_style)
-txtb_levels_b1 = tk.Entry(root, **entry_style)
-txtb_cycles_b1 = tk.Entry(root, **entry_style)
+txtb_cycles_b1 = CompactEntry(grid_b1, "Cycles")
+txtb_cycles_b1.grid(row=2, column=0, columnspan=2, pady=(2, 5), sticky='ew')
+
+grid_b1.columnconfigure(0, weight=1)
+grid_b1.columnconfigure(1, weight=1)
+
 
 def run_b1():
-    symbol = str(txtb_symbol_b1.get())
-    volume = float(txtb_volume_b1.get())
-    tp = float(txtb_tp_b1.get())
-    levels = int(txtb_levels_b1.get())
-    cycles = int(txtb_cycles_b1.get())
-
-    bot = Bot(symbol, volume, tp, levels, cycles)
-    thread = Thread(target=bot.run)
-    thread.start()
-
-btn_run_b1 = tk.Button(root, text='START BOT 1', **btn_style, command=run_b1)
-
-# Grid Layout (Bot 1)
-lbl_symbol_b1.grid(row=6, column=0, **grid_pad)
-txtb_symbol_b1.grid(row=6, column=1, **grid_pad)
-
-lbl_volume_b1.grid(row=7, column=0, **grid_pad)
-txtb_volume_b1.grid(row=7, column=1, **grid_pad)
-
-lbl_tp_b1.grid(row=8, column=0, **grid_pad)
-txtb_tp_b1.grid(row=8, column=1, **grid_pad)
-
-lbl_no_of_levels_b1.grid(row=9, column=0, **grid_pad)
-txtb_levels_b1.grid(row=9, column=1, **grid_pad)
-
-lbl_no_of_cycles_b1.grid(row=10, column=0, **grid_pad)
-txtb_cycles_b1.grid(row=10, column=1, **grid_pad)
-
-btn_run_b1.grid(row=11, column=1, columnspan=2, padx=2, pady=2, sticky='ew')
+    try:
+        symbol = str(txtb_symbol_b1.get())
+        volume = float(txtb_volume_b1.get())
+        tp = float(txtb_tp_b1.get())
+        levels = int(txtb_levels_b1.get())
+        cycles = int(txtb_cycles_b1.get())
+        bot = Bot(symbol, volume, tp, levels, cycles)
+        Thread(target=bot.run).start()
+    except ValueError:
+        print("Check Bot 1 Inputs")
 
 
+btn_run_b1 = tk.Button(content_b1, text='START BOT 1', bg=COLORS['accent_blue'], fg='white', font=FONTS['btn'],
+                       relief='flat', command=run_b1)
+btn_run_b1.pack(fill='x')
 
-# BOT 2 SECTION
+# --- BOT 2 SECTION ---
+fr_b2 = tk.Frame(main_container, bg=COLORS['bg_card'])
+fr_b2.pack(fill='x', pady=(0, 10))
 
-tk.Label(root, text="BOT 2 CONFIG ", bg=COLORS['bg'], fg=COLORS['accent'], font=FONTS['header']).grid(row=12, column=0, columnspan=2, pady=(2, 2), sticky='w', padx=10)
+tk.Frame(fr_b2, bg=COLORS['accent_orange'], width=3).pack(side='left', fill='y')
 
-lbl_symbol_b2 = tk.Label(root, text='Symbol', **lbl_style)
-lbl_volume_b2 = tk.Label(root, text='Volume', **lbl_style)
-lbl_tp_b2 = tk.Label(root, text='Take Profit', **lbl_style)
-lbl_no_of_levels_b2 = tk.Label(root, text='Levels', **lbl_style)
-lbl_no_of_cycles_b2 = tk.Label(root, text='Cycles', **lbl_style)
+content_b2 = tk.Frame(fr_b2, bg=COLORS['bg_card'], padx=10, pady=8)
+content_b2.pack(side='left', fill='both', expand=True)
 
-txtb_symbol_b2 = tk.Entry(root, **entry_style)
-txtb_volume_b2 = tk.Entry(root, **entry_style)
-txtb_tp_b2 = tk.Entry(root, **entry_style)
-txtb_levels_b2 = tk.Entry(root, **entry_style)
-txtb_cycles_b2 = tk.Entry(root, **entry_style)
+tk.Label(content_b2, text="Bot 2", bg=COLORS['bg_card'], fg=COLORS['accent_orange'], font=FONTS['header']).pack(
+    anchor='w', pady=(0, 5))
+
+grid_b2 = tk.Frame(content_b2, bg=COLORS['bg_card'])
+grid_b2.pack(fill='x')
+
+txtb_symbol_b2 = CompactEntry(grid_b2, "Symbol")
+txtb_symbol_b2.grid(row=0, column=0, padx=(0, 2), pady=2, sticky='ew')
+
+txtb_volume_b2 = CompactEntry(grid_b2, "Vol (0.01)")
+txtb_volume_b2.grid(row=0, column=1, padx=(2, 0), pady=2, sticky='ew')
+
+txtb_tp_b2 = CompactEntry(grid_b2, "TP")
+txtb_tp_b2.grid(row=1, column=0, padx=(0, 2), pady=2, sticky='ew')
+
+txtb_levels_b2 = CompactEntry(grid_b2, "Levels")
+txtb_levels_b2.grid(row=1, column=1, padx=(2, 0), pady=2, sticky='ew')
+
+txtb_cycles_b2 = CompactEntry(grid_b2, "Cycles")
+txtb_cycles_b2.grid(row=2, column=0, columnspan=2, pady=(2, 5), sticky='ew')
+
+grid_b2.columnconfigure(0, weight=1)
+grid_b2.columnconfigure(1, weight=1)
+
 
 def run_b2():
-    symbol = str(txtb_symbol_b2.get())
-    volume = float(txtb_volume_b2.get())
-    tp = float(txtb_tp_b2.get())
-    levels = int(txtb_levels_b2.get())
-    cycles = int(txtb_cycles_b2.get())
-
-    bot = Bot(symbol, volume, tp, levels, cycles)
-    thread = Thread(target=bot.run)
-    thread.start()
-
-btn_run_b2 = tk.Button(root, text='START BOT 2', **btn_style, command=run_b2)
-
-# Grid Layout (Bot 2)
-lbl_symbol_b2.grid(row=13, column=0, **grid_pad)
-txtb_symbol_b2.grid(row=13, column=1, **grid_pad)
-
-lbl_volume_b2.grid(row=14, column=0, **grid_pad)
-txtb_volume_b2.grid(row=14, column=1, **grid_pad)
-
-lbl_tp_b2.grid(row=15, column=0, **grid_pad)
-txtb_tp_b2.grid(row=15, column=1, **grid_pad)
-
-lbl_no_of_levels_b2.grid(row=16, column=0, **grid_pad)
-txtb_levels_b2.grid(row=16, column=1, **grid_pad)
-
-lbl_no_of_cycles_b2.grid(row=17, column=0, **grid_pad)
-txtb_cycles_b2.grid(row=17, column=1, **grid_pad)
-
-btn_run_b2.grid(row=18, column=1, columnspan=2, padx=2, pady=2, sticky='ew')
+    try:
+        symbol = str(txtb_symbol_b2.get())
+        volume = float(txtb_volume_b2.get())
+        tp = float(txtb_tp_b2.get())
+        levels = int(txtb_levels_b2.get())
+        cycles = int(txtb_cycles_b2.get())
+        bot = Bot(symbol, volume, tp, levels, cycles)
+        Thread(target=bot.run).start()
+    except ValueError:
+        print("Check Bot 2 Inputs")
 
 
+btn_run_b2 = tk.Button(content_b2, text='START BOT 2', bg=COLORS['accent_orange'], fg='white', font=FONTS['btn'],
+                       relief='flat', command=run_b2)
+btn_run_b2.pack(fill='x')
 
-# BOT 3 SECTION
+# --- BOT 3 SECTION ---
+fr_b3 = tk.Frame(main_container, bg=COLORS['bg_card'])
+fr_b3.pack(fill='x', pady=(0, 10))
 
-tk.Label(root, text="BOT 3 CONFIG ", bg=COLORS['bg'], fg=COLORS['accent'], font=FONTS['header']).grid(row=19, column=0, columnspan=2, pady=(2, 2), sticky='w', padx=10)
+tk.Frame(fr_b3, bg=COLORS['accent_purple'], width=3).pack(side='left', fill='y')
 
-lbl_symbol_b3 = tk.Label(root, text='Symbol', **lbl_style)
-lbl_volume_b3 = tk.Label(root, text='Volume', **lbl_style)
-lbl_tp_b3 = tk.Label(root, text='Take Profit', **lbl_style)
-lbl_no_of_levels_b3 = tk.Label(root, text='Levels', **lbl_style)
-lbl_no_of_cycles_b3 = tk.Label(root, text='Cycles', **lbl_style)
+content_b3 = tk.Frame(fr_b3, bg=COLORS['bg_card'], padx=10, pady=8)
+content_b3.pack(side='left', fill='both', expand=True)
 
-txtb_symbol_b3 = tk.Entry(root, **entry_style)
-txtb_volume_b3 = tk.Entry(root, **entry_style)
-txtb_tp_b3 = tk.Entry(root, **entry_style)
-txtb_levels_b3 = tk.Entry(root, **entry_style)
-txtb_cycles_b3 = tk.Entry(root, **entry_style)
+tk.Label(content_b3, text="Bot 3", bg=COLORS['bg_card'], fg=COLORS['accent_purple'],
+         font=FONTS['header']).pack(anchor='w', pady=(0, 5))
+
+grid_b3 = tk.Frame(content_b3, bg=COLORS['bg_card'])
+grid_b3.pack(fill='x')
+
+txtb_symbol_b3 = CompactEntry(grid_b3, "Symbol")
+txtb_symbol_b3.grid(row=0, column=0, padx=(0, 2), pady=2, sticky='ew')
+
+txtb_volume_b3 = CompactEntry(grid_b3, "Vol (0.01)")
+txtb_volume_b3.grid(row=0, column=1, padx=(2, 0), pady=2, sticky='ew')
+
+txtb_tp_b3 = CompactEntry(grid_b3, "TP")
+txtb_tp_b3.grid(row=1, column=0, padx=(0, 2), pady=2, sticky='ew')
+
+txtb_levels_b3 = CompactEntry(grid_b3, "Levels")
+txtb_levels_b3.grid(row=1, column=1, padx=(2, 0), pady=2, sticky='ew')
+
+txtb_cycles_b3 = CompactEntry(grid_b3, "Cycles")
+txtb_cycles_b3.grid(row=2, column=0, columnspan=2, pady=(2, 5), sticky='ew')
+
+grid_b3.columnconfigure(0, weight=1)
+grid_b3.columnconfigure(1, weight=1)
+
 
 def run_b3():
-    symbol = str(txtb_symbol_b3.get())
-    volume = float(txtb_volume_b3.get())
-    tp = float(txtb_tp_b3.get())
-    levels = int(txtb_levels_b3.get())
-    cycles = int(txtb_cycles_b3.get())
-
-    bot = Bot(symbol, volume, tp, levels, cycles)
-    thread = Thread(target=bot.run)
-    thread.start()
-
-btn_run_b3 = tk.Button(root, text='START BOT 3', **btn_style, command=run_b3)
-
-# Grid Layout (Bot 3)
-lbl_symbol_b3.grid(row=20, column=0, **grid_pad)
-txtb_symbol_b3.grid(row=20, column=1, **grid_pad)
-
-lbl_volume_b3.grid(row=21, column=0, **grid_pad)
-txtb_volume_b3.grid(row=21, column=1, **grid_pad)
-
-lbl_tp_b3.grid(row=22, column=0, **grid_pad)
-txtb_tp_b3.grid(row=22, column=1, **grid_pad)
-
-lbl_no_of_levels_b3.grid(row=23, column=0, **grid_pad)
-txtb_levels_b3.grid(row=23, column=1, **grid_pad)
-
-lbl_no_of_cycles_b3.grid(row=24, column=0, **grid_pad)
-txtb_cycles_b3.grid(row=24, column=1, **grid_pad)
-
-btn_run_b3.grid(row=25, column=1, columnspan=2, padx=2, pady=2, sticky='ew')
+    try:
+        symbol = str(txtb_symbol_b3.get())
+        volume = float(txtb_volume_b3.get())
+        tp = float(txtb_tp_b3.get())
+        levels = int(txtb_levels_b3.get())
+        cycles = int(txtb_cycles_b3.get())
+        bot = Bot(symbol, volume, tp, levels, cycles)
+        Thread(target=bot.run).start()
+    except ValueError:
+        print("Check Bot 3 Inputs")
 
 
-root.grid_columnconfigure(1, weight=1)
+btn_run_b3 = tk.Button(content_b3, text='START BOT 3', bg=COLORS['accent_purple'], fg='white', font=FONTS['btn'],
+                       relief='flat', command=run_b3)
+btn_run_b3.pack(fill='x')
 
 root.mainloop()
